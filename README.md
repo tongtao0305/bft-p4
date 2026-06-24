@@ -4,6 +4,13 @@ SPDX-FileCopyrightText: 2015 Antonin Bas
 SPDX-License-Identifier: Apache-2.0
 -->
 
+# bft-p4
+
+A P4-based experimental platform for programmable-network-assisted Byzantine fault-tolerant protocols.
+
+This repository is initially based on the official p4lang/tutorials repository. We retain the original tutorial structure and add new experiments for BFT-related mechanisms, including ordering-aware scheduling, priority control, and vote aggregation.
+
+
 # P4 Tutorial
 
 * [Introduction](#introduction)
