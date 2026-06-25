@@ -14,6 +14,9 @@
 !*p4app.json
 !topology.json
 !*-runtime.json
+!consensus/common/topo/*.json
+!consensus/common/runtime/*.json
+!consensus/*/runtime/*.json
 
 *.pcap
 
