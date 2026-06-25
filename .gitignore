@@ -29,6 +29,7 @@ build*/
 
 # Logs folders
 logs/
+consensus/iors/results/
 
 # Vagrant
 .vagrant/

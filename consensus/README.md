@@ -505,12 +505,71 @@ bidl_malicious.py
 推荐的最小运行方式：
 
 ```text
-mininet> h2 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_consensus.py --execution-dest 10.0.3.3 --batch-size 2 --count 4 &
-mininet> h3 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_execution.py --count 6 &
+mininet> h2 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_consensus.py --execution-dest 10.0.3.3 --batch-size 2 &
+mininet> h3 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_execution.py &
 mininet> h1 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_leader.py --destinations 10.0.2.2,10.0.3.3 --start-sequence 1 --tx-count 4 --batch-size 2 --tx-rate 10
 ```
 
 这个例子中，leader 以 10 tx/s 发送 4 笔事务，每 2 笔为一个 batch；consensus 收到每个完整 batch 后发送一个 commit，因此 execution 会看到 4 个 speculative transaction 和 2 个 batch commit。
+
+`bidl_consensus.py` 和 `bidl_execution.py` 默认会一直在线运行。它们的 `--count` 参数只用于调试时自动退出；正式实验中通常不需要设置。
+
+执行节点在每个 batch 成功提交时会打印：
+
+```text
+commit_time
+batch_latency_ms
+committed_batches
+committed_txs
+throughput_tps
+```
+
+其中 `throughput_tps` 基于 execution 节点已经提交的事务数和提交时间窗口计算，可用于初步观察吞吐量。
+
+如果希望自动启动 Mininet、运行节点并收集日志，可以使用：
+
+```text
+python3 consensus/iors/scripts/run_experiment.py --batch-size 500 --tx-rate 1000 --tx-count 500 --attack none
+```
+
+常用参数包括：
+
+```text
+--batch-size
+  每个 batch 的事务数量。
+
+--tx-rate
+  leader 发送事务的速率，单位为 tx/s。
+
+--tx-count
+  本轮实验发送的事务总数；不设置时默认等于 batch-size。
+
+--attack
+  可选 none、duplicate、conflict、reorder。
+
+--attack-mode
+  可选 active 或 listen。active 表示恶意节点主动注入，listen 表示监听 leader 事务后篡改。
+```
+
+脚本会把每轮实验输出到：
+
+```text
+consensus/iors/results/<experiment-id>/
+```
+
+其中包括：
+
+```text
+leader.log
+consensus.log
+execution.log
+malicious.log
+summary.csv
+commits.csv
+tx_latencies.csv
+```
+
+`summary.csv` 记录本轮总吞吐量和延迟汇总；`commits.csv` 记录每个 batch 的提交时间和吞吐；`tx_latencies.csv` 记录每笔事务从 execution 节点推测执行到 batch commit 的延迟。
 
 主动攻击示例：
 

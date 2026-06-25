@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument("--commit-delay", type=float, default=0.2,
                         help="Small delay before sending commit so execution can receive leader proposal first")
     parser.add_argument("--count", type=int, default=0,
-                        help="Number of proposals to consume, 0 means forever")
+                        help="Debug limit for received proposal packets, 0 means run forever")
     parser.add_argument("--iface")
     parser.add_argument("--dst-mac",
                         help="Ethernet destination MAC, defaults to this host's gateway MAC")
@@ -56,7 +56,10 @@ def main():
     iface = args.iface or default_iface()
     pending = {}
 
-    print(f"bidl_consensus listening on {iface}, commit destination={args.execution_dest}")
+    print(
+        f"bidl_consensus online on {iface}, "
+        f"batch_size={args.batch_size}, commit destination={args.execution_dest}"
+    )
     sys.stdout.flush()
 
     def handle(pkt):
