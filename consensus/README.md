@@ -95,7 +95,11 @@ consensus/
 │   │   ├── send_consensus.py
 │   │   ├── recv_consensus.py
 │   │   ├── attack_sender.py
-│   │   └── bft_node.py
+│   │   ├── bft_node.py
+│   │   ├── bidl_leader.py
+│   │   ├── bidl_consensus.py
+│   │   ├── bidl_execution.py
+│   │   └── bidl_malicious.py
 │   ├── p4src/
 │   │   ├── constants.p4
 │   │   └── headers.p4
@@ -270,13 +274,13 @@ consensus/iors/p4src/iors.p4
 
 ## 当前拓扑
 
-当前最小拓扑定义在：
+当前最小 BIDL 拓扑定义在：
 
 ```text
 consensus/common/topo/single_switch.json
 ```
 
-拓扑是三主机一交换机：
+拓扑是四主机一交换机：
 
 ```text
 h1 ----\
@@ -284,6 +288,8 @@ h1 ----\
 h2 ----/
        \
         h3
+        |
+        h4
 ```
 
 端口映射：
@@ -292,14 +298,16 @@ h2 ----/
 h1 <-> s1-p1
 h2 <-> s1-p2
 h3 <-> s1-p3
+h4 <-> s1-p4
 ```
 
 主机地址：
 
 ```text
-h1: 10.0.1.1
-h2: 10.0.2.2
-h3: 10.0.3.3
+h1: 10.0.1.1  bidl_leader
+h2: 10.0.2.2  bidl_consensus
+h3: 10.0.3.3  bidl_execution
+h4: 10.0.4.4  bidl_malicious
 ```
 
 ## 编译
@@ -476,6 +484,62 @@ full-demo
 
 这样设计的原因是：当前实验的核心是交换机数据面逻辑。主机侧先作为可控流量生成器，而不是完整共识协议实现，可以让调试更简单。
 
+## BIDL 四类节点
+
+当前也提供了更贴近实验叙事的四类 BIDL 节点：
+
+```text
+bidl_leader.py
+  主节点。给事务分配 sequence，计算 digest，并按指定 tx_count、tx_rate 和 batch_size 通过应用层 fan-out 分别以 unicast 发送给共识节点和执行节点。
+
+bidl_consensus.py
+  共识节点。接收 leader 的事务，收齐一个 batch 后生成 batch commit/result 发给执行节点。
+
+bidl_execution.py
+  执行节点。收到 leader 事务后逐笔推测执行；收到 consensus batch commit 后校验 batch digest，一致则 commit，不一致则 re_execute。
+
+bidl_malicious.py
+  恶意节点。可以主动发送 duplicate/conflict/reorder，也可以监听 leader 事务后篡改或重复发送。
+```
+
+推荐的最小运行方式：
+
+```text
+mininet> h2 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_consensus.py --execution-dest 10.0.3.3 --batch-size 2 --count 4 &
+mininet> h3 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_execution.py --count 6 &
+mininet> h1 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_leader.py --destinations 10.0.2.2,10.0.3.3 --start-sequence 1 --tx-count 4 --batch-size 2 --tx-rate 10
+```
+
+这个例子中，leader 以 10 tx/s 发送 4 笔事务，每 2 笔为一个 batch；consensus 收到每个完整 batch 后发送一个 commit，因此 execution 会看到 4 个 speculative transaction 和 2 个 batch commit。
+
+主动攻击示例：
+
+```text
+mininet> h4 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_malicious.py --mode active --attack conflict --destination 10.0.3.3 --spoof-sender 1 --sequence 10
+```
+
+监听后篡改示例：
+
+```text
+mininet> h4 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_malicious.py --mode listen --attack conflict --destination 10.0.3.3 --leader-id 1 &
+mininet> h1 python3 /home/tongtao/Projects/bft-p4/consensus/common/host/bidl_leader.py --destinations 10.0.3.3,10.0.4.4 --start-sequence 20 --tx-count 1 --batch-size 1
+```
+
+注意：第一版 `bidl_consensus.py` 不是完整 BFT 共识节点，只是把收到的 leader 事务转换为 commit/result 流量；`bidl_execution.py` 也只做 digest 级别的推测执行校验。
+
+### Ethernet 目的地址
+
+主机侧发送脚本默认不再使用二层广播 MAC。`consensus_header.py` 会根据发送接口 MAC 自动推导当前 host 的网关 MAC：
+
+```text
+08:00:00:00:01:11 -> 08:00:00:00:01:00
+08:00:00:00:02:22 -> 08:00:00:00:02:00
+```
+
+这和 `single_switch.json` 中每个 host 的静态 ARP 网关配置一致。也就是说，应用层仍然可以对多个目标 IP 做 fan-out，但每个包在二层都是发往本机网关 MAC，而不是 `ff:ff:ff:ff:ff:ff`。
+
+如果后续换拓扑，可以用各发送脚本的 `--dst-mac` 手动覆盖。
+
 ## 当前状态
 
 当前已经完成：
@@ -497,6 +561,7 @@ Scapy BFT/IORS header
 收包打印脚本
 重复/冲突/乱序流量生成脚本
 轻量 PBFT 阶段流量脚本
+BIDL leader / consensus / execution / malicious 四类节点脚本
 ```
 
 当前尚未完成：

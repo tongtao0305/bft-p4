@@ -31,6 +31,8 @@ def parse_args():
     parser.add_argument("--sequence", type=int, default=10)
     parser.add_argument("--msg-type", default="prepare")
     parser.add_argument("--iface")
+    parser.add_argument("--dst-mac",
+                        help="Ethernet destination MAC, defaults to this host's gateway MAC")
     parser.add_argument("--interval", type=float, default=0.2)
     parser.add_argument("--show", action="store_true")
     return parser.parse_args()
@@ -39,6 +41,7 @@ def parse_args():
 def make_packets(args, iface):
     base = {
         "iface": iface,
+        "dst_mac": args.dst_mac,
         "msg_type": args.msg_type,
         "sender": args.sender,
         "receiver": args.receiver,

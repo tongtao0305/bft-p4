@@ -91,6 +91,12 @@ def get_if():
     raise RuntimeError("Cannot find eth0 interface")
 
 
+def default_gateway_mac(iface):
+    parts = get_if_hwaddr(iface).split(":")
+    parts[-1] = "00"
+    return ":".join(parts)
+
+
 def resolve_ip(host):
     return socket.gethostbyname(host)
 
@@ -111,6 +117,12 @@ def digest32(payload):
     return struct.unpack("!I", hashlib.sha256(payload).digest()[:4])[0]
 
 
+def batch_digest32(digests):
+    encoded = b"".join(struct.pack("!I", digest & 0xFFFFFFFF)
+                       for digest in digests)
+    return digest32(encoded)
+
+
 def parse_u32(value):
     if isinstance(value, int):
         return value & 0xFFFFFFFF
@@ -122,7 +134,7 @@ def build_consensus_packet(
     payload,
     *,
     iface=None,
-    dst_mac="ff:ff:ff:ff:ff:ff",
+    dst_mac=None,
     sport=None,
     dport=CONSENSUS_UDP_PORT,
     msg_type=MSG_REQUEST,
@@ -138,6 +150,8 @@ def build_consensus_packet(
 ):
     if iface is None:
         iface = get_if()
+    if dst_mac is None:
+        dst_mac = default_gateway_mac(iface)
     if sport is None:
         sport = random.randint(49152, 65535)
     if isinstance(payload, str):

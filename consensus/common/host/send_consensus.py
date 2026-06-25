@@ -34,6 +34,8 @@ def parse_args():
                         help="Override current digest as decimal or 0x-prefixed integer")
     parser.add_argument("--sport", type=int)
     parser.add_argument("--dport", type=int, default=CONSENSUS_UDP_PORT)
+    parser.add_argument("--dst-mac",
+                        help="Ethernet destination MAC, defaults to this host's gateway MAC")
     parser.add_argument("--flags", type=int, default=FLAG_TEST)
     parser.add_argument("--iface", help="Network interface, defaults to first eth0")
     parser.add_argument("--show", action="store_true", help="Print packet details")
@@ -49,6 +51,7 @@ def main():
         args.destination,
         args.payload,
         iface=iface,
+        dst_mac=args.dst_mac,
         sport=args.sport,
         dport=args.dport,
         msg_type=args.msg_type,
